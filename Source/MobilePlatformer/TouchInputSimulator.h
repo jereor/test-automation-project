@@ -22,7 +22,7 @@ private:
 	UWorld* World;
 	FVector2D ScreenSize;
 
-	void GenerateRandomSwipeParams(FVector2D& StartPos, FVector2D& EndPos, float& Duration);
-	void SimulateSwipe(const FVector2D& StartPos, const FVector2D& EndPos, float Duration);
+	void GenerateRandomSwipeParams(FVector2D& StartPos, FVector2D& EndPos, float& Duration) const;
+	void SimulateSwipe(const FVector2D& StartPos, const FVector2D& EndPos, float Duration) const;
 	static float GetRandomDelay();
 };
