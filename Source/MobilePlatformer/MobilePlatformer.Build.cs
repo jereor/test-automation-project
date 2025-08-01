@@ -4,7 +4,7 @@ using UnrealBuildTool;
 
 public class MobilePlatformer : ModuleRules
 {
-	public MobilePlatformer(ReadOnlyTargetRules Target) : base(Target)
+	public MobilePlatformer(ReadOnlyTargetRules target) : base(target)
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
@@ -18,19 +18,5 @@ public class MobilePlatformer : ModuleRules
 			"SlateCore",
 			"ApplicationCore"
 		});
-
-		if (Target.Configuration != UnrealTargetConfiguration.Shipping)
-		{
-			PublicDependencyModuleNames.AddRange(new string[]
-			{
-				"AutomationController",
-				"AutomationTest",
-				"FunctionalTesting",
-				"AutomationWindow",
-				"UnrealEd",
-				"ToolMenus",
-				"AutomationMessages"
-			});
-		}
 	}
 }
