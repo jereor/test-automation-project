@@ -1,4 +1,3 @@
-
 #pragma once
 
 #include "CoreMinimal.h"
@@ -6,6 +5,8 @@
 #include "Tests/AutomationCommon.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
+
+DECLARE_LOG_CATEGORY_EXTERN(LogTouchInputSimulator, Log, All);
 
 class MOBILEPLATFORMER_API FTouchInputSimulator
 {

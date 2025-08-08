@@ -11,12 +11,14 @@
 #include "GameFramework/PlayerController.h"
 #include "HAL/PlatformProcess.h"
 
+DEFINE_LOG_CATEGORY(LogTouchInputSimulator);
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRandomTouchSwipeTest, "TouchAutomation.RandomSwipeTest", 
     EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FRandomTouchSwipeTest::RunTest(const FString& Parameters)
 {
-    UE_LOG(LogTemp, Log, TEXT("RunTest: FRandomTouchSwipeTest"));
+    UE_LOG(LogTouchInputSimulator, Log, TEXT("RunTest: FRandomTouchSwipeTest"));
     TSharedPtr<FTouchInputSimulator> SimulatorPtr = MakeShared<FTouchInputSimulator>();
     SimulatorPtr->StartRandomSwipeSimulation();
 
@@ -61,11 +63,11 @@ void FTouchInputSimulator::StartRandomSwipeSimulation()
 {
     if (!World)
     {
-        UE_LOG(LogTemp, Error, TEXT("TouchInputSimulator: No valid world found"));
+        UE_LOG(LogTouchInputSimulator, Error, TEXT("TouchInputSimulator: No valid world found"));
         return;
     }
     
-    UE_LOG(LogTemp, Log, TEXT("TouchInputSimulator: Starting random swipe simulation"));
+    UE_LOG(LogTouchInputSimulator, Log, TEXT("TouchInputSimulator: Starting random swipe simulation"));
     
     // Schedule the first swipe
     const float InitialDelay = GetRandomDelay();
@@ -97,7 +99,7 @@ void FTouchInputSimulator::StopSimulation()
     if (World && SwipeTimerHandle.IsValid())
     {
         World->GetTimerManager().ClearTimer(SwipeTimerHandle);
-        UE_LOG(LogTemp, Log, TEXT("TouchInputSimulator: Stopped simulation"));
+        UE_LOG(LogTouchInputSimulator, Log, TEXT("TouchInputSimulator: Stopped simulation"));
     }
 }
 
@@ -111,8 +113,8 @@ void FTouchInputSimulator::GenerateRandomSwipeParams(FVector2D& StartPos, FVecto
     StartPos.Y = FMath::FRandRange(MarginY, ScreenSize.Y - MarginY);
     
     // Generate a random swipe direction and distance
-    const float SwipeDistance = FMath::RandRange(100.0f, 300.0f);
-    const float SwipeAngle = FMath::RandRange(0.0f, 2.0f * PI);
+    const float SwipeDistance = FMath::FRandRange(100.0f, 300.0f);
+    const float SwipeAngle = FMath::FRandRange(0.0f, 2.0f * PI);
     
     EndPos.X = StartPos.X + SwipeDistance * FMath::Cos(SwipeAngle);
     EndPos.Y = StartPos.Y + SwipeDistance * FMath::Sin(SwipeAngle);
@@ -121,79 +123,64 @@ void FTouchInputSimulator::GenerateRandomSwipeParams(FVector2D& StartPos, FVecto
     EndPos.X = FMath::Clamp(EndPos.X, 0.0f, ScreenSize.X);
     EndPos.Y = FMath::Clamp(EndPos.Y, 0.0f, ScreenSize.Y);
     
-    // Random duration between 0.2 and 0.8 seconds - FIX: Use FMath::FRandRange for float values
+    // Generate a random duration
     Duration = FMath::FRandRange(0.2f, 0.8f);
     
-    UE_LOG(LogTemp, Log, TEXT("TouchInputSimulator: Swipe from (%.1f, %.1f) to (%.1f, %.1f) over %.2f seconds"),
+    UE_LOG(LogTouchInputSimulator, Log, TEXT("TouchInputSimulator: Swipe from (%.1f, %.1f) to (%.1f, %.1f) over %.2f seconds"),
         StartPos.X, StartPos.Y, EndPos.X, EndPos.Y, Duration);
 }
 
 void FTouchInputSimulator::SimulateSwipe(const FVector2D& StartPos, const FVector2D& EndPos, const float Duration) const
 {
-    APlayerController* PlayerController = nullptr;
-    if (World)
+    if (!World)
     {
-        if (World->GetFirstPlayerController())
-        {
-            PlayerController = World->GetFirstPlayerController();
-        }
-    }
-    
-    if (!PlayerController)
-    {
-        UE_LOG(LogTemp, Error, TEXT("TouchInputSimulator: No PlayerController available"));
+        UE_LOG(LogTouchInputSimulator, Error, TEXT("TouchInputSimulator: No valid world found"));
         return;
     }
     
-    // Schedule touch events using a timer
-    if (World)
+    APlayerController* PlayerController = World->GetFirstPlayerController();
+    if (!PlayerController)
     {
-        constexpr int32 Steps = 10; // Number of interpolation steps for smooth swipe
-        UE_LOG(LogTemp, Log, TEXT("TouchInputSimulator: Simulating swipe with %d steps"), Steps);
-        
-        // Send initial touchdown event
-        FVector2D NormalizedStartPos;
-        NormalizedStartPos.X = StartPos.X / ScreenSize.X;
-        NormalizedStartPos.Y = StartPos.Y / ScreenSize.Y;
-        PlayerController->InputTouch(0, ETouchType::Began, NormalizedStartPos, 1.0f, FDateTime::Now(), 0);
-        
-        // Create a weak pointer to the player controller for safe capture
-        TWeakObjectPtr<APlayerController> WeakPlayerController = PlayerController;
-        
-        for (int32 i = 1; i <= Steps; i++)
-        {
-            float Alpha = static_cast<float>(i) / Steps;
-            FVector2D CurrentPos = FMath::Lerp(StartPos, EndPos, Alpha);
-            
-            // Convert screen coordinates to normalized coordinates (0-1)
-            FVector2D NormalizedPos;
-            NormalizedPos.X = CurrentPos.X / ScreenSize.X;
-            NormalizedPos.Y = CurrentPos.Y / ScreenSize.Y;
+        UE_LOG(LogTouchInputSimulator, Error, TEXT("TouchInputSimulator: No PlayerController available"));
+        return;
+    }
+    
+    // Send initial touchdown event
+    FVector2D NormalizedStartPos;
+    NormalizedStartPos.X = StartPos.X / ScreenSize.X;
+    NormalizedStartPos.Y = StartPos.Y / ScreenSize.Y;
+    PlayerController->InputTouch(0, ETouchType::Began, NormalizedStartPos, 1.0f, FDateTime::Now(), 0);
+    
+    TWeakObjectPtr<APlayerController> WeakPlayerController = PlayerController; // A weak pointer for later safe capture
+    
+    constexpr float Steps = 10; // Number of interpolation steps for a smooth swipe
+    UE_LOG(LogTouchInputSimulator, Log, TEXT("TouchInputSimulator: Simulating swipe with %f steps"), Steps);
 
-            const float Delay = Duration * Alpha;
-            
-            // Use a capture to ensure the correct values are used in the timer callback
-            FVector2D CapturedPos = NormalizedPos;
-            bool bIsLastStep = (i == Steps);
-            
-            // Schedule a touch event with a weak pointer
-            FTimerHandle TempHandle;
-            World->GetTimerManager().SetTimer(TempHandle, [WeakPlayerController, CapturedPos, bIsLastStep]()
+    for (int32 i = 1; i <= Steps; i++)
+    {
+        float Alpha = i / Steps;
+        const FVector2D CurrentPos = FMath::Lerp(StartPos, EndPos, Alpha);
+        
+        FVector2D NormalizedPos;
+        NormalizedPos.X = CurrentPos.X / ScreenSize.X;
+        NormalizedPos.Y = CurrentPos.Y / ScreenSize.Y;
+
+        const float Delay = Duration * Alpha;
+        FVector2D CapturedPos = NormalizedPos;
+        bool bIsLastStep = i == Steps;
+        
+        // Schedule a touch event with a weak pointer
+        FTimerHandle TouchTimerHandle;
+        World->GetTimerManager().SetTimer(TouchTimerHandle, [WeakPlayerController, CapturedPos, bIsLastStep]()
+        {
+            if (APlayerController* ControllerPtr = WeakPlayerController.Get())
             {
-                if (APlayerController* ControllerPtr = WeakPlayerController.Get())
-                {
-                    // Send the appropriate touch event with all required parameters
-                    if (bIsLastStep)
-                    {
-                        ControllerPtr->InputTouch(0, ETouchType::Ended, CapturedPos, 1.0f, FDateTime::Now(), 0);
-                    }
-                    else
-                    {
-                        ControllerPtr->InputTouch(0, ETouchType::Moved, CapturedPos, 1.0f, FDateTime::Now(), 0);
-                    }
-                }
-            }, Delay, false);
-        }
+                // Send the appropriate touch event with all required parameters
+                const auto TouchType = bIsLastStep ? ETouchType::Ended : ETouchType::Moved;
+                ControllerPtr->InputTouch(0, TouchType, CapturedPos, 1.0f, FDateTime::Now(), 0);
+            }
+        }, Delay, // Wait before executing
+        false); // Don't repeat the timer (run once only)
     }
 }
 
